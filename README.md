@@ -1,3 +1,5 @@
+> **Tagore Career Institute ecosystem** (student / parent / teacher / office / director app, PTM, fees, accounts) lives in [`tagore/`](tagore/README.md) - run `python run_tagore.py demo`.
+
 # OMR Reader – आसान OMR चेकिंग (Windows / Mac / Linux desktop app)
 
 Scan your students' OMR sheets (many batches, many sets) → get **rank list, batch-wise results and an
