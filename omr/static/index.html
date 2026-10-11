@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OMR Reader</title>
+<style>
+:root{
+  --bg:#f4f6fa; --card:#fff; --ink:#1b2430; --muted:#657285; --line:#dde3ec;
+  --brand:#1f5fbf; --brand-ink:#fff; --ok:#1c8a4a; --warn:#b7791f; --bad:#c0392b;
+  --okbg:#e3f5ea; --warnbg:#fff3d6; --badbg:#fde8e6; --chip:#eef2f8;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#10151c; --card:#18202a; --ink:#e8edf4; --muted:#93a1b5; --line:#2a3544; --brand:#5b9bff; --brand-ink:#0b1220;
+    --ok:#4cc380; --warn:#e0a84a; --bad:#ff7b6b; --okbg:#143222; --warnbg:#3a2d12; --badbg:#3b1a17; --chip:#222d3a;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Devanagari",sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.bar{max-width:1200px;margin:0 auto;padding:10px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.logo{font-weight:700;font-size:18px}
+.logo small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+nav button{background:none;border:1px solid transparent;padding:8px 12px;border-radius:8px;cursor:pointer;color:var(--ink);font:inherit}
+nav button.on{background:var(--brand);color:var(--brand-ink)}
+nav button:not(.on):hover{background:var(--chip)}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+h2{margin:0 0 4px;font-size:18px} h3{margin:16px 0 8px;font-size:15px}
+.hint{color:var(--muted);font-size:13px;margin:2px 0 10px}
+a.btn{text-decoration:none}
+button.btn,label.btn,a.btn{background:var(--brand);color:var(--brand-ink);border:0;border-radius:8px;padding:9px 14px;font:inherit;cursor:pointer;display:inline-block}
+button.btn.sec,label.btn.sec,a.btn.sec{background:var(--chip);color:var(--ink);border:1px solid var(--line)}
+button.btn.danger{background:var(--badbg);color:var(--bad);border:1px solid var(--bad)}
+button.btn:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+textarea{width:100%;font-family:ui-monospace,Consolas,monospace}
+label.f{display:block;font-size:13px;color:var(--muted);margin-bottom:10px}
+label.f>input,label.f>select{display:block;margin-top:3px;width:100%}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat b{display:block;font-size:24px} .stat span{color:var(--muted);font-size:13px}
+.stat.click{cursor:pointer} .stat.warn b{color:var(--warn)}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--card)}
+tbody tr.link{cursor:pointer} tbody tr.link:hover{background:var(--chip)}
+.tw{overflow:auto;max-height:68vh}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:var(--chip)}
+.tag.warn{background:var(--warnbg);color:var(--warn)} .tag.bad{background:var(--badbg);color:var(--bad)} .tag.ok{background:var(--okbg);color:var(--ok)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:8px 12px;cursor:pointer;color:var(--muted);font:inherit}
+.tabs button.on{border-color:var(--brand);color:var(--ink);font-weight:600}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:30px;text-align:center;color:var(--muted)}
+.drop.over{border-color:var(--brand);background:var(--chip)}
+.prog{height:10px;background:var(--chip);border-radius:6px;overflow:hidden;margin-top:12px}
+.prog>div{height:100%;background:var(--brand);width:0;transition:width .2s}
+.sheetwrap{position:relative;display:block;width:100%;line-height:0}
+.sheetwrap img{width:100%;display:block;border:1px solid var(--line);border-radius:6px}
+.box{position:absolute;border:2px solid;border-radius:3px;font-size:12px;line-height:1;pointer-events:none}
+.box b{position:absolute;top:-1px;left:-1px;padding:2px 5px;color:#fff;font-weight:600}
+.dot{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:rgba(28,138,74,.75);border:2px solid #0b5;pointer-events:none}
+.qbox{position:absolute;border:3px solid #e67e22;background:rgba(230,126,34,.15);border-radius:4px;pointer-events:none}
+.qbox.sel{border-color:#c0392b;background:rgba(192,57,43,.2)}
+.split{display:grid;grid-template-columns:minmax(300px,1fr) minmax(300px,1fr);gap:16px}
+@media(max-width:860px){.split{grid-template-columns:1fr}}
+.chips{display:inline-flex;gap:3px}
+.chip{border:1px solid var(--line);background:var(--chip);border-radius:6px;min-width:30px;padding:3px 7px;cursor:pointer;font:inherit;color:var(--ink)}
+.chip.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.chip.right{outline:2px solid var(--ok)}
+.qrow{display:flex;align-items:center;gap:10px;padding:5px 6px;border-radius:8px}
+.qrow.bad{background:var(--warnbg)} .qrow:hover{background:var(--chip)}
+.qrow span.n{width:34px;text-align:right;color:var(--muted)}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:4px}
+.kgrid div{display:flex;align-items:center;gap:4px} .kgrid span{width:26px;text-align:right;color:var(--muted);font-size:12px}
+.kgrid select{padding:3px 4px;width:100%}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow:auto}
+.modal>.card{width:min(1150px,100%);margin:0}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+.welcome{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.steps{counter-reset:s;padding-left:0;list-style:none;margin:8px 0}
+.steps li{counter-increment:s;padding:6px 0 6px 34px;position:relative}
+.steps li:before{content:counter(s);position:absolute;left:0;top:5px;width:24px;height:24px;border-radius:50%;background:var(--brand);color:var(--brand-ink);text-align:center;line-height:24px;font-size:13px}
+.legend span{display:inline-block;margin-right:10px;font-size:13px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <div class="logo">OMR Reader<small>OMR शीट चेकिंग – आसान तरीका</small></div>
+  <label class="f" style="margin:0;min-width:200px">Exam / परीक्षा
+    <select id="examSel"></select></label>
+  <nav id="nav"></nav>
+</div></header>
+<main id="main"></main>
+<div id="modalRoot"></div>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const api = async (url, opts = {}) => {
+  if (opts.json !== undefined) { opts.method = opts.method || "POST"; opts.headers = {"Content-Type":"application/json"}; opts.body = JSON.stringify(opts.json); }
+  const r = await fetch(url, opts);
+  let data = null; try { data = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error((data && data.error) || ("Error " + r.status));
+  return data;
+};
+function toast(msg, ms = 3500) {
+  document.querySelectorAll(".toast").forEach(x => x.remove());
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
+const S = { tab: localStorage.getItem("tab") || "setup", exams: [], templates: [], examId: +localStorage.getItem("examId") || 0, resTab: "results", batchFilter: "", q: "" };
+const TABS = [["setup","1  Sheet Setup · शीट सेटअप"],["exam","2  Exam & Key · परीक्षा / आंसर की"],["scan","3  Scan · स्कैन"],["results","4  Results · रिज़ल्ट"]];
+const curExam = () => S.newExam ? undefined : S.exams.find(e => e.id === S.examId);
+const curTpl = () => { const e = curExam(); return e && S.templates.find(t => t.id === e.template_id); };
+
+async function boot() {
+  [S.exams, S.templates] = await Promise.all([api("/api/exams"), api("/api/templates")]);
+  if (!S.exams.find(e => e.id === S.examId)) S.examId = S.exams[0] ? S.exams[0].id : 0;
+  const sel = $("#examSel");
+  sel.innerHTML = S.exams.length ? S.exams.map(e => `<option value="${e.id}" ${e.id === S.examId ? "selected" : ""}>${esc(e.name)}</option>`).join("") : "<option>(no exam yet)</option>";
+  sel.onchange = () => { S.newExam = false; S.examId = +sel.value; localStorage.setItem("examId", S.examId); render(); };
+  $("#nav").innerHTML = TABS.map(([k, v]) => `<button data-k="${k}" class="${S.tab === k ? "on" : ""}">${v}</button>`).join("");
+  $("#nav").onclick = e => { const k = e.target.dataset.k; if (k) { S.tab = k; localStorage.setItem("tab", k); boot(); } };
+  render();
+}
+function render() {
+  ({ setup: viewSetup, exam: viewExam, scan: viewScan, results: viewResults })[S.tab]();
+}
+const welcome = () => `
+<div class="card welcome"><div style="flex:1;min-width:260px"><h2>Welcome! 👋 शुरू कैसे करें</h2>
+<ol class="steps"><li><b>Sheet Setup</b> – ek baar apni OMR sheet ka scan upload karein, app khud bubbles pehchan lega.</li>
+<li><b>Exam &amp; Key</b> – exam banayein, answer key paste karein ya master sheet scan karein (set A/B/C/D alag key).</li>
+<li><b>Scan</b> – scanner ki images / PDF ka folder drop karein. Batch ka naam likhein.</li>
+<li><b>Results</b> – rank, batch-wise result, Excel export. Key galat nikli? Sudhaar karein – result turant update, dobara scan nahi.</li></ol></div>
+<div><button class="btn" id="demoBtn">▶ Try demo (1 click)</button><div class="hint">Sample sheets ke saath poora app try karein.</div></div></div>`;
+async function runDemo() {
+  const b = $("#demoBtn"); b.disabled = true; b.textContent = "Preparing demo…";
+  try { const r = await api("/api/demo", { method: "POST" }); S.examId = r.exam_id; localStorage.setItem("examId", r.exam_id); S.tab = "results"; localStorage.setItem("tab", "results"); await boot(); }
+  catch (e) { toast(e.message); b.disabled = false; }
+}
+
+/* ============================== 1. SHEET SETUP ============================== */
+const TYPE_COLORS = { answers: "#1f5fbf", roll: "#d9730d", batch: "#8e44ad", set: "#1c8a4a", ignore: "#7f8c8d" };
+const TYPE_NAMES = { answers: "Answers / जवाब", roll: "Roll No / रोल नं.", batch: "Batch code", set: "Set code (A/B/C/D)", ignore: "Ignore / छोड़ें" };
+const SU = { det: null, test: null, name: "", labels: "ABCD", sens: "normal", rotation: 0 };
+
+function viewSetup() {
+  const m = $("#main");
+  m.innerHTML = (S.exams.length ? "" : welcome()) + `
+  <div class="card"><h2>Saved sheet types</h2>
+    <div class="hint">Har tarah ki OMR sheet ke liye sirf ek baar setup. Different institute sheets = alag type.</div>
+    <div>${S.templates.length ? S.templates.map(t => `<span class="tag" style="margin:2px 6px 2px 0;padding:5px 10px">${esc(t.name)} · ${t.blocks.length} blocks
+      <a href="#" data-del="${t.id}" style="color:var(--bad);text-decoration:none" title="delete">✕</a></span>`).join("") : "<i>none yet</i>"}</div></div>
+  <div class="card"><h2>New sheet type · नई शीट सेटअप करें</h2>
+    <div class="hint">Ek <b>bhari hui (filled) scanned sheet</b> upload karein – roll no. aur kuch answers filled hone chahiye. Scan 200–300 dpi.</div>
+    <div class="row"><label class="btn" for="sampleFile">📄 Choose sample scan</label><input id="sampleFile" type="file" accept="image/*,.pdf" class="hide">
+      <a class="btn sec" href="/api/sample/sheet.png?seed=3" download>Download practice sheet</a></div>
+    <div id="setupBody"></div></div>`;
+  m.querySelectorAll("[data-del]").forEach(a => a.onclick = async ev => { ev.preventDefault(); try { await api("/api/templates/" + a.dataset.del, { method: "DELETE" }); await boot(); } catch (e) { toast(e.message); } });
+  if (!S.exams.length) $("#demoBtn").onclick = runDemo;
+  $("#sampleFile").onchange = async ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    const fd = new FormData(); fd.append("image", f); fd.append("labels", SU.labels);
+    try { SU.det = await api("/api/detect", { method: "POST", body: fd }); SU.rotation = 0; SU.test = null; paintSetup(); } catch (e) { toast(e.message); }
+  };
+  if (SU.det) paintSetup();
+}
+function paintSetup() {
+  const d = SU.det, body = $("#setupBody");
+  if (d.error) { body.innerHTML = `<p class="tag bad">${esc(d.error)}</p>`; return; }
+  const blockRows = d.blocks.map((b, i) => `
+    <tr><td><b style="color:${TYPE_COLORS[b.type]}">#${i + 1}</b></td><td>${b.rows}×${b.cols}</td>
+    <td><select data-i="${i}" data-f="type">${Object.entries(TYPE_NAMES).map(([k, v]) => `<option value="${k}" ${b.type === k ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+    <td>${b.type === "ignore" ? "" : `<select data-i="${i}" data-f="orient">
+      ${b.type === "answers" ? `<option value="across" ${b.orient === "across" ? "selected" : ""}>Options left→right</option><option value="down" ${b.orient === "down" ? "selected" : ""}>Options top→bottom</option>`
+        : b.type === "set" ? `<option value="across" ${b.orient === "across" ? "selected" : ""}>in a row</option><option value="down" ${b.orient === "down" ? "selected" : ""}>in a column</option>`
+        : `<option value="down" ${b.orient === "down" ? "selected" : ""}>digits top→bottom</option><option value="across" ${b.orient === "across" ? "selected" : ""}>digits left→right</option>`}</select>`}</td>
+    <td>${(b.type === "roll" || b.type === "batch") ? `<select data-i="${i}" data-f="digits"><option value="0123456789" ${(b.digits || "0123456789") === "0123456789" ? "selected" : ""}>0 1 2 … 9</option><option value="1234567890" ${b.digits === "1234567890" ? "selected" : ""}>1 2 … 9 0</option><option value="9876543210" ${b.digits === "9876543210" ? "selected" : ""}>9 8 … 0</option></select>` : ""}</td></tr>`).join("");
+  const boxes = d.blocks.map((b, i) => `<div class="box" style="left:${b.x0 / d.width * 100}%;top:${b.y0 / d.height * 100}%;width:${(b.x1 - b.x0) / d.width * 100}%;height:${(b.y1 - b.y0) / d.height * 100}%;border-color:${TYPE_COLORS[b.type]}"><b style="background:${TYPE_COLORS[b.type]}">${i + 1}</b></div>`).join("");
+  const dots = SU.test ? SU.test.overlay.map(o => `<div class="dot" style="left:${o[0] / d.width * 100}%;top:${o[1] / d.height * 100}%"></div>`).join("") : "";
+  body.innerHTML = `
+  <div class="split" style="margin-top:14px">
+    <div><div class="sheetwrap"><img src="${d.image}">${boxes}${dots}</div></div>
+    <div>
+      <h3 style="margin-top:0">Detected ${d.blocks.length} bubble blocks – check types</h3>
+      <div class="hint">Hamne khud andaza lagaya hai. Galat ho to dropdown se badal dein. Rangeen box = block number.</div>
+      <div class="tw" style="max-height:300px"><table><thead><tr><th>#</th><th>Size</th><th>What is it?</th><th>Direction</th><th>Digits</th></tr></thead><tbody id="blkRows">${blockRows}</tbody></table></div>
+      <div class="row" style="margin-top:12px">
+        <label class="f" style="margin:0">Options per question
+          <select id="suLabels"><option value="ABCD">4 options (A B C D)</option><option value="ABCDE">5 options (A–E)</option><option value="ABC">3 options (A B C)</option><option value="1234">1 2 3 4</option></select></label>
+        <label class="f" style="margin:0">Mark sensitivity
+          <select id="suSens"><option value="normal">Normal</option><option value="high">Catch light pencil marks</option><option value="low">Only dark marks</option></select></label>
+        <button class="btn sec" id="suRot">↻ Rotate sheet</button>
+      </div>
+      <div class="row" style="margin-top:6px"><button class="btn" id="suTest">▶ Test read this sheet</button></div>
+      <div id="suResult" style="margin-top:10px"></div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+      <div class="row"><label class="f" style="margin:0;flex:1">Name this sheet type<input id="suName" placeholder="e.g. 100Q Institute OMR" value="${esc(SU.name)}"></label>
+      <button class="btn" id="suSave">💾 Save sheet type</button></div>
+    </div></div>`;
+  $("#suLabels").value = SU.labels; $("#suSens").value = SU.sens;
+  $("#blkRows").onchange = ev => {
+    const t = ev.target, i = +t.dataset.i, b = d.blocks[i];
+    b[t.dataset.f] = t.value;
+    if (t.dataset.f === "type") { b.orient = (b.type === "roll" || b.type === "batch") ? "down" : (b.type === "set" ? (b.rows === 1 ? "across" : "down") : b.orient); }
+    SU.test = null; paintSetup();
+  };
+  $("#suLabels").onchange = async ev => { SU.labels = ev.target.value; await redetect(); };
+  $("#suSens").onchange = ev => { SU.sens = ev.target.value; };
+  $("#suRot").onclick = async () => { SU.rotation = (SU.rotation + 90) % 360; await redetect(); };
+  $("#suName").oninput = ev => { SU.name = ev.target.value; };
+  $("#suTest").onclick = async () => {
+    try { SU.test = await api("/api/templates/test", { json: { token: d.token, rotation: SU.rotation, template: buildTpl() } }); paintSetup(); showTest(); } catch (e) { toast(e.message); }
+  };
+  $("#suSave").onclick = async () => {
+    try { await api("/api/templates", { json: { ...buildTpl(), name: SU.name, signature: d.signature } }); toast("Saved ✔ – ab Step 2 par jayein"); SU.det = null; S.tab = "exam"; localStorage.setItem("tab", "exam"); await boot(); }
+    catch (e) { toast(e.message); }
+  };
+  if (SU.test) showTest();
+}
+async function redetect() {
+  try { SU.det = await api("/api/redetect", { json: { token: SU.det.token, labels: SU.labels, rotation: SU.rotation } }); SU.test = null; paintSetup(); } catch (e) { toast(e.message); }
+}
+function buildTpl() {
+  return { labels: SU.labels, sensitivity: SU.sens,
+    blocks: SU.det.blocks.map(b => ({ type: b.type, orient: b.orient, ...(b.type === "roll" || b.type === "batch" ? { digits: b.digits || "0123456789" } : {}) })) };
+}
+function showTest() {
+  const t = SU.test, el = $("#suResult"); if (!el) return;
+  el.innerHTML = `<div class="card" style="background:var(--chip);margin:0">
+    <div><b>Roll:</b> ${esc(t.roll || "–")} &nbsp; <b>Batch:</b> ${esc(t.batch || "–")} &nbsp; <b>Set:</b> ${esc(t.set || "–")} &nbsp; <b>Questions read:</b> ${t.answers.length}</div>
+    <div class="hint">Green dots = jo marks app ne padhe. Image se match karein.</div>
+    <div style="font-family:ui-monospace,monospace;word-break:break-all">${t.answers.map((a, i) => (i % 5 === 0 ? " " : "") + (a || "·")).join("")}</div>
+    ${t.notes.length ? `<p class="tag bad">${esc(t.notes.join("; "))}</p>` : ""}</div>`;
+}
+
+/* ============================== 2. EXAM & KEY ============================== */
+const KS = { set: "A", keys: [] };
+async function viewExam() {
+  const m = $("#main"), ex = curExam();
+  m.innerHTML = (S.exams.length ? "" : welcome()) + `
+  <div class="card"><h2>${ex ? "Exam settings" : "Create your first exam"} · परीक्षा</h2>
+    <div class="grid2" style="margin-top:10px">
+      <label class="f">Exam name<input id="exName" value="${esc(ex ? ex.name : "")}" placeholder="e.g. Weekly Test 12"></label>
+      <label class="f">Date<input id="exDate" type="date" value="${esc(ex ? ex.date : "")}"></label>
+      <label class="f">Sheet type<select id="exTpl">${S.templates.map(t => `<option value="${t.id}" ${ex && ex.template_id === t.id ? "selected" : ""}>${esc(t.name)}</option>`).join("") || "<option value=''>(set up in step 1)</option>"}</select></label>
+      <label class="f">Marks per correct (+)<input id="exPos" type="number" step="0.25" value="${ex ? ex.cfg.correct : 1}"></label>
+      <label class="f">Marks per wrong (−) <small>(negative e.g. -1, or 0)</small><input id="exNeg" type="number" step="0.25" value="${ex ? ex.cfg.wrong : 0}"></label>
+      <label class="f">If 2+ bubbles marked<select id="exMulti"><option value="wrong">Count as wrong (apply negative)</option><option value="zero">Count as unattempted (0)</option></select></label>
+    </div>
+    <label class="f">Subject sections <small>(optional) e.g. Physics 1-45, Chemistry 46-90, Maths 91-135. Custom marks: Physics 1-30 4/-1</small>
+      <input id="exSec" value="${esc(ex ? (ex.cfg.sections || []).map(s => `${s.name} ${s.start}-${s.end}${s.correct != null ? ` ${s.correct}/${s.wrong}` : ""}`).join(", ") : "")}"></label>
+    <div class="row"><button class="btn" id="exSave">💾 ${ex ? "Save changes" : "Create exam"}</button>
+      ${ex ? `<button class="btn sec" id="exNew">+ New exam</button><button class="btn danger" id="exDel">Delete this exam</button>` : ""}</div></div>
+  <div id="keyCard"></div>
+  <div class="card"><h2>Student list (optional) · विद्यार्थी सूची</h2>
+    <div class="hint">CSV / Excel with columns <b>Roll</b>, <b>Name</b>, <b>Batch</b> – result me naam apne aap aa jayega.</div>
+    <label class="btn sec" for="stFile">Import student list</label><input id="stFile" type="file" accept=".csv,.xlsx" class="hide"></div>`;
+  if (!S.exams.length) $("#demoBtn").onclick = runDemo;
+  if (ex) $("#exMulti").value = ex.cfg.multi || "wrong";
+  $("#exSave").onclick = async () => {
+    try {
+      const r = await api("/api/exams", { json: { id: ex && ex.id, name: $("#exName").value, date: $("#exDate").value, template_id: +$("#exTpl").value,
+        correct: +$("#exPos").value, wrong: +$("#exNeg").value, multi: $("#exMulti").value, sections_text: $("#exSec").value } });
+      S.newExam = false; S.examId = r.id; localStorage.setItem("examId", r.id); toast("Saved ✔"); await boot();
+    } catch (e) { toast(e.message); }
+  };
+  if (ex) {
+    $("#exNew").onclick = () => { S.newExam = true; viewExam(); };
+    $("#exDel").onclick = async () => { if (confirm("Delete this exam AND all its scanned sheets?")) { await api("/api/exams/" + ex.id, { method: "DELETE" }); S.examId = 0; await boot(); } };
+  }
+  $("#stFile").onchange = async ev => {
+    const fd = new FormData(); fd.append("file", ev.target.files[0]);
+    try { const r = await api("/api/students/import", { method: "POST", body: fd }); toast(`${r.imported} students imported`); } catch (e) { toast(e.message); }
+  };
+  if (ex) paintKeys();
+}
+async function paintKeys() {
+  const ex = curExam(), card = $("#keyCard");
+  KS.keys = await api(`/api/exams/${ex.id}/keys`);
+  if (!KS.keys.find(k => k.set === KS.set)) KS.set = KS.keys[0] ? KS.keys[0].set : "A";
+  const cur = KS.keys.find(k => k.set === KS.set);
+  const allSets = [...new Set([...KS.keys.map(k => k.set), KS.set])];
+  card.innerHTML = `<div class="card"><h2>Answer key · आंसर की</h2>
+    <div class="hint">Alag-alag set (A/B/C/D) ke liye alag key. Key badalne par saare result <b>turant</b> dobara calculate ho jaate hain – sheets dobara scan nahi karni.</div>
+    <div class="tabs">${allSets.map(s => `<button data-s="${s}" class="${s === KS.set ? "on" : ""}">Set ${esc(s)}${KS.keys.find(k => k.set === s) ? ` <span class="tag ok">${KS.keys.find(k => k.set === s).count}</span>` : ""}</button>`).join("")}
+      <button data-s="+">+ add set</button></div>
+    <textarea id="keyText" rows="3" placeholder="Paste key: ABCDABCD…   or   1.A 2.B 3.(AC) 4.*   — (AC) = either accepted, * = bonus (sabko marks), - = question cancelled">${esc(cur ? cur.text : "")}</textarea>
+    <div class="row" style="margin-top:8px"><button class="btn" id="keySave">💾 Save key for Set ${esc(KS.set)}</button>
+      <label class="btn sec" for="keySheet">📷 Read key from scanned master sheet</label><input id="keySheet" type="file" accept="image/*,.pdf" class="hide">
+      ${cur ? `<button class="btn danger" id="keyDel">Delete this set</button>` : ""}
+      <span id="keyInfo" class="hint"></span></div>
+    <h3>Edit question by question</h3><div class="kgrid" id="kgrid"></div></div>`;
+  card.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    if (b.dataset.s === "+") { const s = (prompt("New set name (e.g. B)") || "").trim().toUpperCase(); if (!s) return; KS.set = s; } else KS.set = b.dataset.s;
+    paintKeys();
+  });
+  const ta = $("#keyText"), labels = (curTpl() || {}).labels || "ABCD";
+  const paintGrid = () => {
+    const toks = parseKeyClient(ta.value);
+    $("#keyInfo").textContent = toks.length ? `${toks.length} questions in key` : "";
+    $("#kgrid").innerHTML = toks.map((t, i) => `<div><span>${i + 1}</span><select data-q="${i}">${["", ...labels, "*", "-"].map(o => `<option ${o === t ? "selected" : ""} value="${o}">${o === "" ? "—" : o === "*" ? "* bonus" : o === "-" ? "- cancel" : o}</option>`).join("")}${t.length > 1 ? `<option selected value="${t}">(${t})</option>` : ""}</select></div>`).join("");
+  };
+  ta.oninput = paintGrid; paintGrid();
+  $("#kgrid").onchange = ev => { const toks = parseKeyClient(ta.value); toks[+ev.target.dataset.q] = ev.target.value; ta.value = toks.map(t => t.length > 1 ? `(${t})` : (t || "_")).join(""); paintGrid(); };
+  $("#keySave").onclick = async () => {
+    try { const r = await api(`/api/exams/${ex.id}/keys`, { method: "PUT", json: { set: KS.set, text: ta.value } });
+      toast(`Key saved: ${r.count} questions` + (r.invalid.length ? ` ⚠ invalid options in Q ${r.invalid.slice(0, 8).join(", ")}` : "")); await boot(); } catch (e) { toast(e.message); }
+  };
+  if ($("#keyDel")) $("#keyDel").onclick = async () => { await api(`/api/exams/${ex.id}/keys/${KS.set}`, { method: "DELETE" }); await boot(); };
+  $("#keySheet").onchange = async ev => {
+    const fd = new FormData(); fd.append("image", ev.target.files[0]);
+    try { const r = await api(`/api/exams/${ex.id}/key_from_sheet`, { method: "POST", body: fd }); ta.value = r.text; paintGrid();
+      toast(r.unclear.length ? `Read ✔ – but ${r.unclear.length} questions blank (Q ${r.unclear.slice(0, 8).join(", ")}…). Fill them, then Save.` : "Read ✔ – check, then press Save"); } catch (e) { toast(e.message); }
+  };
+}
+function parseKeyClient(text) {
+  text = (text || "").toUpperCase().trim(); const nums = [...text.matchAll(/(\d+)\s*[.):=,\-]?\s*(\([A-Z*-]+\)|[A-Z*]+|-)/g)];
+  if (nums.length >= 2 && /\d/.test(text)) { const t = {}; nums.forEach(m => t[+m[1]] = m[2].replace(/[()]/g, "")); const n = Math.max(...Object.keys(t).map(Number)); return Array.from({ length: n }, (_, i) => t[i + 1] || ""); }
+  const out = []; for (let i = 0; i < text.length; i++) { const ch = text[i];
+    if (ch === "(") { let j = text.indexOf(")", i); if (j < 0) j = text.length; out.push(text.slice(i + 1, j).replace(/[^A-Z]/g, "")); i = j; }
+    else if (/[A-Z*\-_]/.test(ch)) out.push(ch === "_" ? "" : ch); }
+  return out;
+}
+
+/* ================================ 3. SCAN ================================== */
+async function viewScan() {
+  const m = $("#main"), ex = curExam();
+  if (!ex) { m.innerHTML = welcome() + `<div class="card">Pehle Step 2 me exam banayein.</div>`; $("#demoBtn").onclick = runDemo; return; }
+  const sheets = await api(`/api/exams/${ex.id}/sheets`);
+  const batches = [...new Set(sheets.map(s => s.batch).filter(Boolean))];
+  const tpl = curTpl(), hasBatch = tpl && tpl.blocks.some(b => b.type === "batch");
+  m.innerHTML = `<div class="card"><h2>Scan sheets · ${esc(ex.name)}</h2>
+    <div class="hint">Scanner se bani images (JPG/PNG/TIFF) ya PDF – folder ya files drop karein. Ek saath hazaaron sheets chalti hain.</div>
+    <div class="row"><label class="f" style="margin:0;min-width:240px">Batch name / बैच ${hasBatch ? "<small>(sheet ke batch code se bhi padha jayega)</small>" : ""}
+      <input id="batch" list="batchList" placeholder="e.g. Morning-A"><datalist id="batchList">${batches.map(b => `<option value="${esc(b)}">`).join("")}</datalist></label></div>
+    <div class="drop" id="drop" style="margin-top:12px"><div style="font-size:30px">📥</div><b>Drag &amp; drop</b> sheet images / PDFs here<br>
+      <div class="row" style="justify-content:center;margin-top:10px"><label class="btn" for="fFiles">Choose files</label><label class="btn sec" for="fDir">Choose folder</label></div>
+      <input id="fFiles" type="file" multiple accept="image/*,.pdf,.tif,.tiff" class="hide"><input id="fDir" type="file" webkitdirectory multiple class="hide"></div>
+    <div class="prog hide" id="prog"><div></div></div><div id="scanMsg" class="hint"></div></div>
+    <div class="card"><h2>Already have data from your OMR machine? · मशीन की फ़ाइल</h2>
+      <div class="hint">Camlin/other machine ki exported CSV/Excel (Roll, Set, Responses ya Q1..Qn columns) seedhe import karein – scanning ki zaroorat nahi.</div>
+      <label class="btn sec" for="mFile">Import machine file</label><input id="mFile" type="file" accept=".csv,.xlsx" class="hide"></div>
+    <div class="card"><h2>${sheets.length} sheets in this exam</h2>
+      <div class="row"><button class="btn" id="goRes">See results →</button><button class="btn danger" id="clr" ${sheets.length ? "" : "disabled"}>Delete all sheets of this exam</button></div></div>`;
+  const drop = $("#drop");
+  ["dragenter", "dragover"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", ev => uploadSheets(ev.dataTransfer.files));
+  $("#fFiles").onchange = ev => uploadSheets(ev.target.files);
+  $("#fDir").onchange = ev => uploadSheets(ev.target.files);
+  $("#goRes").onclick = () => { S.tab = "results"; localStorage.setItem("tab", "results"); boot(); };
+  $("#clr").onclick = async () => { if (confirm("Delete ALL scanned sheets of this exam?")) { await api(`/api/exams/${ex.id}/clear`, { method: "POST" }); viewScan(); } };
+  $("#mFile").onchange = async ev => {
+    const fd = new FormData(); fd.append("file", ev.target.files[0]); fd.append("batch", $("#batch").value);
+    try { const r = await api(`/api/exams/${ex.id}/import_responses`, { method: "POST", body: fd }); toast(`${r.imported} students imported`); viewScan(); } catch (e) { toast(e.message, 6000); }
+  };
+}
+async function uploadSheets(list) {
+  const ex = curExam(); const files = [...list].filter(f => /\.(jpe?g|png|bmp|tiff?|pdf)$/i.test(f.name));
+  if (!files.length) { toast("No image/PDF files found"); return; }
+  const prog = $("#prog"); prog.classList.remove("hide"); const bar = prog.firstElementChild; const msg = $("#scanMsg");
+  const batch = $("#batch").value; const CH = 6; let done = 0, review = 0, err = 0;
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  for (let i = 0; i < files.length; i += CH) {
+    const fd = new FormData(); files.slice(i, i + CH).forEach(f => fd.append("files", f)); fd.append("batch", batch);
+    try { const r = await api(`/api/exams/${ex.id}/scan`, { method: "POST", body: fd });
+      r.done.forEach(d => { done++; if (d.error) err++; else if (d.flags) review++; }); } catch (e) { err += CH; msg.textContent = "Error: " + e.message; }
+    bar.style.width = Math.min(100, (i + CH) / files.length * 100) + "%";
+    msg.textContent = `Reading… ${Math.min(i + CH, files.length)} / ${files.length}`;
+  }
+  msg.innerHTML = `<b>Done ✔</b> ${done} sheet(s) read. ${review ? `<span class="tag warn">${review} need a quick look</span>` : ""} ${err ? `<span class="tag bad">${err} failed</span>` : ""}`;
+}
+
+/* =============================== 4. RESULTS ================================ */
+async function viewResults() {
+  const m = $("#main"), ex = curExam();
+  if (!ex) { m.innerHTML = welcome() + `<div class="card">Koi exam nahi.</div>`; $("#demoBtn").onclick = runDemo; return; }
+  const [R, sheets] = await Promise.all([api(`/api/exams/${ex.id}/results`), api(`/api/exams/${ex.id}/sheets`)]);
+  const review = sheets.filter(s => s.needs_review || !s.result || s.duplicate);
+  const avg = R.rows.length ? (R.rows.reduce((a, r) => a + r.score, 0) / R.rows.length).toFixed(1) : "–";
+  const batches = [...new Set(R.rows.map(r => r.batch || "-"))];
+  const susp = R.stats.filter(s => s.suspicious);
+  m.innerHTML = `
+  <div class="stats">
+    <div class="stat"><b>${R.total}</b><span>Sheets scanned</span></div>
+    <div class="stat"><b>${R.rows.length}</b><span>Scored</span></div>
+    <div class="stat"><b>${avg}</b><span>Average score</span></div>
+    <div class="stat"><b>${R.rows[0] ? R.rows[0].score : "–"}</b><span>Highest</span></div>
+    <div class="stat click ${review.length ? "warn" : ""}" id="stReview"><b>${review.length}</b><span>Need attention ›</span></div>
+    <div class="stat click ${susp.length ? "warn" : ""}" id="stKey"><b>${susp.length}</b><span>Questions: check key ›</span></div>
+  </div>
+  <div class="card">
+    <div class="tabs" id="rtabs">${[["results", "Results"], ["review", `Needs attention (${review.length})`], ["batches", "Batch summary"], ["qa", "Question analysis"]].map(([k, v]) => `<button data-k="${k}" class="${S.resTab === k ? "on" : ""}">${v}</button>`).join("")}
+      <span style="flex:1"></span><a class="btn" href="/api/exams/${ex.id}/export.xlsx">⬇ Download Excel</a></div>
+    <div id="rbody"></div></div>`;
+  $("#rtabs").onclick = ev => { const k = ev.target.dataset.k; if (k) { S.resTab = k; viewResults(); } };
+  $("#stReview").onclick = () => { S.resTab = "review"; viewResults(); };
+  $("#stKey").onclick = () => { S.resTab = "qa"; viewResults(); };
+  const body = $("#rbody");
+  if (!R.total) { body.innerHTML = `<p>No sheets yet – go to <b>3 Scan</b>.</p>`; return; }
+  if (S.resTab === "results") {
+    const secs = []; R.rows.forEach(r => Object.keys(r.sections).forEach(s => { if (!secs.includes(s)) secs.push(s); }));
+    body.innerHTML = `<div class="row" style="margin-bottom:10px"><label class="f" style="margin:0">Batch<select id="bf"><option value="">All batches</option>${batches.map(b => `<option ${S.batchFilter === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></label>
+      <label class="f" style="margin:0">Search<input id="qs" placeholder="roll or name" value="${esc(S.q)}"></label></div>
+      <div class="tw"><table><thead><tr><th>Rank</th><th>Roll</th><th>Name</th><th>Batch</th><th>Set</th><th>Score</th><th>%</th><th>✔</th><th>✘</th><th>Blank</th>${secs.map(s => `<th>${esc(s)}</th>`).join("")}<th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
+    const fill = () => {
+      const q = S.q.toLowerCase();
+      $("#tb").innerHTML = R.rows.filter(r => (!S.batchFilter || (r.batch || "-") === S.batchFilter) && (!q || r.roll.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)))
+        .map(r => `<tr class="link" data-id="${r.id}"><td><b>${r.rank}</b></td><td>${esc(r.roll)}</td><td>${esc(r.name)}</td><td>${esc(r.batch)}</td><td>${esc(r.set)}</td><td><b>${r.score}</b> / ${r.max}</td><td>${r.percent}</td><td>${r.correct}</td><td>${r.wrong}</td><td>${r.blank}</td>
+        ${secs.map(s => `<td>${r.sections[s] ? r.sections[s].score : ""}</td>`).join("")}<td>${r.needs_review ? '<span class="tag warn">check</span>' : ""}${r.issues.includes("Duplicate roll number") ? '<span class="tag bad">duplicate</span>' : ""}</td></tr>`).join("");
+    };
+    fill(); $("#bf").onchange = ev => { S.batchFilter = ev.target.value; fill(); }; $("#qs").oninput = ev => { S.q = ev.target.value; fill(); };
+    $("#tb").onclick = ev => { const tr = ev.target.closest("tr"); if (tr) openSheet(+tr.dataset.id, []); };
+  } else if (S.resTab === "review") {
+    body.innerHTML = review.length ? `<div class="hint">In sheets ko ek baar dekh lein (roll no. / dhundhle marks / dobara mark). Row par click karein.</div><div class="tw"><table><thead><tr><th>File</th><th>Roll</th><th>Batch</th><th>Set</th><th>Problem</th></tr></thead><tbody>${review.map(s => `<tr class="link" data-id="${s.id}"><td>${esc(s.file)}</td><td>${esc(s.roll) || "?"}</td><td>${esc(s.batch)}</td><td>${esc(s.set)}</td><td>${[...s.issues, ...s.warnings].map(i => `<span class="tag warn">${esc(i)}</span> `).join("")}</td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="tag ok">All sheets look good ✔</p>`;
+    body.onclick = ev => { const tr = ev.target.closest("tr.link"); if (tr) openSheet(+tr.dataset.id, review.map(r => r.id)); };
+  } else if (S.resTab === "batches") {
+    body.innerHTML = `<table><thead><tr><th>Batch</th><th>Students</th><th>Average</th><th>Highest</th><th>Lowest</th></tr></thead><tbody>${R.batches.map(b => `<tr><td>${esc(b.batch)}</td><td>${b.students}</td><td>${b.average}</td><td>${b.highest}</td><td>${b.lowest}</td></tr>`).join("")}</tbody></table>`;
+  } else {
+    body.innerHTML = `<div class="hint">Har question par kitne bachon ne kaunsa option bhara. <b>Agar zyada bachon ne key se alag option choose kiya</b> to key galat ho sakti hai – CHECK KEY. Key theek karte hi result update.</div>
+      <div class="tw"><table><thead><tr><th>Set</th><th>Q</th><th>Key</th><th>% correct</th>${(curTpl() ? curTpl().labels : "ABCD").split("").map(l => `<th>${l}</th>`).join("")}<th>Blank</th><th>Multi</th><th></th></tr></thead><tbody>
+      ${R.stats.map(s => `<tr style="${s.suspicious ? "background:var(--warnbg)" : ""}"><td>${esc(s.set)}</td><td>${s.q}</td><td><b>${esc(s.key)}</b></td><td>${s.pct_correct}</td>${Object.entries(s.dist).map(([l, n]) => `<td style="${l === s.top ? "font-weight:700" : ""}">${n}</td>`).join("")}<td>${s.blank}</td><td>${s.multi}</td><td>${s.suspicious ? `<span class="tag warn">CHECK KEY (most chose ${s.top})</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+}
+
+/* ============================ SHEET REVIEW MODAL =========================== */
+async function openSheet(id, queue) {
+  let d; try { d = await api("/api/sheets/" + id); } catch (e) { toast(e.message); return; }
+  const root = $("#modalRoot"); const labels = d.labels.split("");
+  const ans = d.answers.slice(); let showAll = false, sel = null;
+  const close = () => { root.innerHTML = ""; if (S.tab === "results") viewResults(); };
+  const keyOf = i => d.key[i] || "";
+  const draw = () => {
+    const bad = new Set(d.bad_q);
+    const qb = Object.entries(d.qboxes).filter(([q]) => bad.has(+q)).map(([q, b]) => `<div class="qbox ${sel === +q ? "sel" : ""}" style="left:${b[0] / d.ref_w * 100}%;top:${b[1] / d.ref_h * 100}%;width:${(b[2] - b[0]) / d.ref_w * 100}%;height:${(b[3] - b[1]) / d.ref_h * 100}%"></div>`).join("");
+    const qs = ans.map((a, i) => ({ q: i + 1, a, bad: bad.has(i + 1) })).filter(x => showAll || x.bad || (x.a === "" && false));
+    const res = d.result;
+    root.innerHTML = `<div class="modal"><div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">${esc(d.file)} ${d.needs_review ? '<span class="tag warn">needs check</span>' : ""}</h2><button class="btn sec" id="mClose">✕ Close</button></div>
+      ${[...d.issues, ...d.warnings, ...d.notes].map(i => `<span class="tag warn" style="margin:6px 4px 0 0">${esc(i)}</span>`).join("")}
+      <div class="split" style="margin-top:12px">
+        <div id="imgPane" style="max-height:78vh;overflow:auto">${d.preview ? `<div class="sheetwrap"><img src="${d.preview}">${qb}</div>` : "<i>No image (imported from file)</i>"}</div>
+        <div style="max-height:78vh;overflow:auto">
+          <div class="grid2"><label class="f">Roll No<input id="mRoll" value="${esc(d.roll)}"></label>
+            <label class="f">Set<input id="mSet" value="${esc(d.set)}" placeholder="${d.key_sets.join("/")}"></label>
+            <label class="f">Batch<input id="mBatch" value="${esc(d.batch)}"></label></div>
+          ${res ? `<div class="hint">Score <b>${res.score}</b> / ${res.max} · ✔ ${res.correct} · ✘ ${res.wrong} · blank ${res.blank}</div>` : ""}
+          <div class="row" style="justify-content:space-between"><h3 style="margin:6px 0">${showAll ? "All answers" : "Questions to check"} (${qs.length})</h3>
+            <button class="btn sec" id="mAll">${showAll ? "Show only flagged" : "Show all answers"}</button></div>
+          ${qs.length ? qs.map(x => `<div class="qrow ${x.bad ? "bad" : ""}" data-q="${x.q}"><span class="n">Q${x.q}</span><span class="chips">
+            ${labels.map(l => `<button class="chip ${x.a.includes(l) ? "on" : ""} ${keyOf(x.q - 1).includes(l) && keyOf(x.q - 1).length < 5 ? "right" : ""}" data-q="${x.q}" data-l="${l}">${l}</button>`).join("")}
+            <button class="chip ${x.a === "" ? "on" : ""}" data-q="${x.q}" data-l="">–</button></span><small class="hint">${x.bad ? "check image" : ""}</small></div>`).join("") : "<p class='hint'>Nothing flagged.</p>"}
+          <div class="hint legend"><span><span class="chip right" style="padding:0 6px">A</span> = correct per key</span></div>
+        </div></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn" id="mSave">✔ Save &amp; mark OK</button>
+        ${queue.length > 1 ? `<button class="btn sec" id="mNext">Save &amp; next ›</button>` : ""}
+        <button class="btn danger" id="mDel">Delete sheet</button></div></div></div>`;
+    $("#mClose").onclick = close;
+    $("#mAll").onclick = () => { showAll = !showAll; draw(); };
+    root.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+      const q = +c.dataset.q - 1, l = c.dataset.l;
+      if (l === "") ans[q] = ""; else { const set = new Set(ans[q].split("").filter(Boolean)); set.has(l) ? set.delete(l) : set.add(l); ans[q] = [...set].sort().join(""); }
+      sel = q + 1; const sy = $("#imgPane").scrollTop, ly = root.querySelector(".split > div:last-child").scrollTop; draw(); $("#imgPane").scrollTop = sy; root.querySelector(".split > div:last-child").scrollTop = ly;
+    });
+    root.querySelectorAll(".qrow").forEach(r => r.addEventListener("mouseenter", () => scrollTo(+r.dataset.q)));
+    const save = async () => api("/api/sheets/" + id, { method: "PUT", json: { roll: $("#mRoll").value, set: $("#mSet").value.toUpperCase(), batch: $("#mBatch").value, answers: ans, reviewed: true } });
+    $("#mSave").onclick = async () => { try { await save(); toast("Saved ✔"); close(); } catch (e) { toast(e.message); } };
+    if ($("#mNext")) $("#mNext").onclick = async () => { try { await save(); const i = queue.indexOf(id); const nxt = queue[i + 1] || queue.find(x => x !== id); if (nxt) openSheet(nxt, queue.filter(x => x !== id)); else close(); } catch (e) { toast(e.message); } };
+    $("#mDel").onclick = async () => { if (confirm("Delete this sheet?")) { await api("/api/sheets/" + id, { method: "DELETE" }); close(); } };
+  };
+  function scrollTo(q) {
+    const b = d.qboxes[String(q)]; const pane = $("#imgPane"); if (!b || !pane) return;
+    const img = pane.querySelector("img"); if (!img) return;
+    pane.scrollTo({ top: Math.max(0, b[1] / d.ref_h * img.clientHeight - 120), behavior: "smooth" });
+  }
+  draw(); if (d.bad_q[0]) setTimeout(() => scrollTo(d.bad_q[0]), 150);
+}
+
+boot().catch(e => toast(e.message));
+</script>
+</body>
+</html>
