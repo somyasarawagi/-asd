@@ -15,3 +15,6 @@ A personal voice assistant. Say "Somya, ..." and a command.
 - "Somya bye"
 
 Add more in `handle()` inside `somya.py`.
+
+## Easiest way (no install)
+Double-click `somya/index.html` (open in Chrome), tap the orb and talk.
